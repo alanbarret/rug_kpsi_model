@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['Knot']
+
+roboflow:
+  workspace: rugkpsi
+  project: knots-segmentation-pdfgu
+  version: 3
+  license: CC BY 4.0
+  url: https://app.roboflow.com/rugkpsi/knots-segmentation-pdfgu/3

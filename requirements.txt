@@ -1,0 +1,9 @@
+flask
+flask_sock
+requests
+opencv-python-headless
+numpy
+pyngrok
+ultralytics
+scikit-learn
+
