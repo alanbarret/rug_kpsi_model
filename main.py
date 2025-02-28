@@ -10,6 +10,7 @@ from queue import Queue
 import json
 from flask_sock import Sock
 from sklearn.cluster import AgglomerativeClustering
+import base64
 
 app = Flask(__name__)
 
@@ -353,7 +354,7 @@ stream_page_template = """
                 clientVideo.srcObject = stream;
 
                 // Setup WebSocket connection
-                ws = new WebSocket('wss://4140-2-50-137-20.ngrok-free.app/ws');
+                ws = new WebSocket('wss://deed-2-50-137-17.ngrok-free.app/ws');
                 
                 ws.onopen = () => {
                     startBtn.disabled = true;
@@ -591,7 +592,7 @@ def upload_file():
 
         # Run inference
         print("[DEBUG] Running YOLO inference...")
-        results = model.predict(img, imgsz=640, conf=0.4, iou=0.1)[0]
+        results = model.predict(img, imgsz=640, conf=0.5, iou=0.1)[0]
 
         # Get show_boxes parameter
         show_boxes = request.form.get('show_boxes') == 'true'
@@ -712,18 +713,18 @@ def upload_file():
         cv2.line(padded_img, (padding, padding//2), (width+padding, padding//2), (0, 0, 0), 2)
         cv2.putText(padded_img, f"{len(cols)} knots",
                     (padding + width//2 - 100, padding//2 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+                    cv2.FONT_HERSHEY_DUPLEX, 0.7, (0, 0, 0), 2)
 
         # Draw vertical measurement lines and labels
         cv2.line(padded_img, (width+padding+padding//2, padding), (width+padding+padding//2, height+padding), (0, 0, 0), 2)
         cv2.putText(padded_img, f"{len(rows)} knots",
                     (width+padding+padding//2 + 10, padding + height//2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+                    cv2.FONT_HERSHEY_DUPLEX, 0.7, (0, 0, 0), 2)
 
         # Add total knot count in bottom padding
         cv2.putText(padded_img, f"{int(knot_count)} Total Knots",
                     (padding + width//2 - 100, height + padding + padding//2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+                    cv2.FONT_HERSHEY_DUPLEX, 0.7, (0, 0, 0), 2)
 
         # Convert padded image to JPEG format
         print("[DEBUG] Encoding final image...")
@@ -739,6 +740,142 @@ def upload_file():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/predict_api", methods=["POST"])
+def predict_api():
+    if "file" not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No selected file"}), 400
+    
+    try:
+        # Read the file data into memory
+        img_data = file.read()
+        
+        # Convert image data to numpy array
+        nparr = np.frombuffer(img_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        # Get confidence threshold from request, default to 0.5
+        conf = float(request.form.get('conf', 0.5))
+
+        # Run inference
+        results = model.predict(img, imgsz=640, conf=conf, iou=0.1)[0]
+
+        # Get show_boxes parameter
+        show_boxes = request.form.get('show_boxes') == 'true'
+
+        # Lists to store center points of knots
+        centers_x = []
+        centers_y = []
+
+        # Process each result and extract boxes
+        boxes = []  # Store all boxes and their centers
+        height, width = img.shape[:2]
+        
+        for r in results:
+            for box in r.boxes:
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
+                
+                # Calculate box area and visible area
+                box_width = x2 - x1
+                box_height = y2 - y1
+                total_area = box_width * box_height
+                
+                # Calculate visible area
+                visible_x1 = max(0, x1)
+                visible_y1 = max(0, y1)
+                visible_x2 = min(width, x2)
+                visible_y2 = min(height, y2)
+                
+                visible_width = visible_x2 - visible_x1
+                visible_height = visible_y2 - visible_y1
+                visible_area = visible_width * visible_height
+                
+                if visible_area >= 0.5 * total_area:
+                    center_x = (x1 + x2) // 2
+                    center_y = (y1 + y2) // 2
+                    boxes.append({
+                        'coords': (x1, y1, x2, y2),
+                        'center': (center_x, center_y)
+                    })
+                    centers_x.append(center_x)
+                    centers_y.append(center_y)
+
+        # Sort centers
+        centers_y.sort()
+        centers_x.sort()
+
+        # Set tolerances based on average knot size
+        if len(boxes) > 0:
+            avg_width = sum((b['coords'][2] - b['coords'][0]) for b in boxes) / len(boxes)
+            avg_height = sum((b['coords'][3] - b['coords'][1]) for b in boxes) / len(boxes)
+            x_tolerance_input = int(request.form.get('x_tolerance', 0.5))
+            y_tolerance_input = int(request.form.get('y_tolerance', 0.5))
+            x_tolerance = int(avg_width * x_tolerance_input)
+            y_tolerance = int(avg_height * y_tolerance_input)
+        else:
+            x_tolerance = y_tolerance = 5
+
+        # Find representative points for rows and columns
+        rows = []
+        cols = []
+        
+        # Cluster y-coordinates into rows
+        if centers_y:
+            current_row = [centers_y[0]]
+            for y in centers_y[1:]:
+                if y - current_row[-1] <= y_tolerance:
+                    current_row.append(y)
+                else:
+                    rows.append(sum(current_row) // len(current_row))
+                    current_row = [y]
+            if current_row:
+                rows.append(sum(current_row) // len(current_row))
+
+        # Cluster x-coordinates into columns
+        if centers_x:
+            current_col = [centers_x[0]]
+            for x in centers_x[1:]:
+                if x - current_col[-1] <= x_tolerance:
+                    current_col.append(x)
+                else:
+                    cols.append(sum(current_col) // len(current_col))
+                    current_col = [x]
+            if current_col:
+                cols.append(sum(current_col) // len(current_col))
+
+        # Add padding and draw boxes if requested
+        padding = 1
+        height, width = img.shape[:2]
+        padded_img = np.full((height + 2*padding, width + 2*padding, 3), 255, dtype=np.uint8)
+        padded_img[padding:padding+height, padding:padding+width] = img
+
+        if show_boxes:
+            for box in boxes:
+                x1, y1, x2, y2 = box['coords']
+                cv2.rectangle(padded_img, 
+                            (x1 + padding, y1 + padding),
+                            (x2 + padding, y2 + padding),
+                            (0, 255, 0), 2)
+
+        # Convert image to base64
+        _, buffer = cv2.imencode('.jpg', padded_img)
+        img_base64 = base64.b64encode(buffer).decode('utf-8')
+
+        return jsonify({
+            "image": f"data:image/jpeg;base64,{img_base64}",
+            "rows": len(rows),
+            "columns": len(cols),
+            "total_knots": len(rows) * len(cols)
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/download_image")
 def download_image():
