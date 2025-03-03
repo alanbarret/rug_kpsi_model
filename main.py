@@ -590,9 +590,10 @@ def upload_file():
         nparr = np.frombuffer(img_data, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
+        
         # Run inference
         print("[DEBUG] Running YOLO inference...")
-        results = model.predict(img, imgsz=640, conf=0.5, iou=0.1)[0]
+        results = model.predict(img, imgsz=320, conf=0.45, iou=0.1)[0]
 
         # Get show_boxes parameter
         show_boxes = request.form.get('show_boxes') == 'true'
