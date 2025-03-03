@@ -783,8 +783,8 @@ def predict_api():
         # Enhance image
         img = enhance_image(img)
 
-        # Get confidence threshold from request, default to 0.5
-        conf = float(request.form.get('conf', 0.5))
+        # Get confidence threshold from request, default to 0.3
+        conf = float(request.form.get('conf', 0.3))
 
         # Run inference
         results = model.predict(img, imgsz=640, conf=conf, iou=0.1)[0]
