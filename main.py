@@ -670,7 +670,7 @@ def upload_file():
             avg_width = sum((b['coords'][2] - b['coords'][0]) for b in boxes) / len(boxes)
             avg_height = sum((b['coords'][3] - b['coords'][1]) for b in boxes) / len(boxes)
             print(f"[DEBUG] Found {avg_height, avg_width} avg heigth/width")
-            x_tolerance = int(avg_width * 0.5)  # 50% of average knot width
+            x_tolerance = int(avg_width * 0.3)  # 50% of average knot width
             y_tolerance = int(avg_height * 0.5)  # 60% of average knot height
         else:
             x_tolerance = y_tolerance = 5  # Default fallback values
