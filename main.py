@@ -779,6 +779,9 @@ def predict_api():
         # Convert image data to numpy array
         nparr = np.frombuffer(img_data, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        # Enhance image
+        img = enhance_image(img)
 
         # Get confidence threshold from request, default to 0.5
         conf = float(request.form.get('conf', 0.5))
