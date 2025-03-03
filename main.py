@@ -570,6 +570,25 @@ def websocket(ws):
     finally:
         print("WebSocket connection closed")
 
+def enhance_image(img):
+    # Apply Gaussian blur to reduce noise
+    blurred = cv2.GaussianBlur(img, (3, 3), 0)
+    
+    # Enhance contrast using CLAHE
+    lab = cv2.cvtColor(blurred, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    l = clahe.apply(l)
+    enhanced_lab = cv2.merge((l, a, b))
+    enhanced = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
+    
+    # Sharpen the image
+    kernel = np.array([[-1,-1,-1], 
+                      [-1, 9,-1],
+                      [-1,-1,-1]])
+    sharpened = cv2.filter2D(enhanced, -1, kernel)
+    
+    return sharpened
 
 @app.route("/predict", methods=["POST"])
 def upload_file():
@@ -590,7 +609,9 @@ def upload_file():
         nparr = np.frombuffer(img_data, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        
+        # Enhance image
+        img = enhance_image(img)
+
         # Run inference
         print("[DEBUG] Running YOLO inference...")
         results = model.predict(img, imgsz=320, conf=0.3, iou=0.1)[0]
