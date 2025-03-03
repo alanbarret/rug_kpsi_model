@@ -882,5 +882,5 @@ def download_image():
     img_file = "/tmp/processed_image.jpg"
     return send_file(img_file, mimetype='image/jpeg')
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+# if __name__ == "__main__":
+#     app.run(host="0.0.0.0", port=5000)
