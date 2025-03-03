@@ -838,8 +838,8 @@ def predict_api():
         if len(boxes) > 0:
             avg_width = sum((b['coords'][2] - b['coords'][0]) for b in boxes) / len(boxes)
             avg_height = sum((b['coords'][3] - b['coords'][1]) for b in boxes) / len(boxes)
-            x_tolerance_input = int(request.form.get('x_tolerance', 0.5))
-            y_tolerance_input = int(request.form.get('y_tolerance', 0.5))
+            x_tolerance_input = float(request.form.get('x_tolerance', 0.5))
+            y_tolerance_input = float(request.form.get('y_tolerance', 0.5))
             x_tolerance = int(avg_width * x_tolerance_input)
             y_tolerance = int(avg_height * y_tolerance_input)
         else:
