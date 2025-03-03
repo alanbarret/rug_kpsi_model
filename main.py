@@ -593,7 +593,7 @@ def upload_file():
         
         # Run inference
         print("[DEBUG] Running YOLO inference...")
-        results = model.predict(img, imgsz=320, conf=0.45, iou=0.1)[0]
+        results = model.predict(img, imgsz=320, conf=0.3, iou=0.1)[0]
 
         # Get show_boxes parameter
         show_boxes = request.form.get('show_boxes') == 'true'
